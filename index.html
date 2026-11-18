@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>投資策略儀表板</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#1b2430;--mu:#5b6776;--ln:#d8dee6;--pri:#1f3a5f;--ac:#2a9d8f;--bad:#c0452d;--ok:#1f8a7d;--warn:#b7791f;--ma20:#d98e1f;--ma60:#2a9d8f;--ma200:#c0452d;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f151c;--card:#17202a;--tx:#e6ebf0;--mu:#9aa7b5;--ln:#2a3644;--pri:#8fb4e3;--ac:#4cc3b3;--bad:#ef8a73;--ok:#4cc3b3;--warn:#e6b04f;--ma20:#e6b04f;--ma60:#4cc3b3;--ma200:#ef8a73;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.6 system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif}
+main{max-width:1040px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:8px;margin-bottom:6px}
+h1{font-size:22px;margin:0;color:var(--pri)}
+h2{font-size:16px;margin:0 0 10px;color:var(--pri)}
+.clock{text-align:right}.clock .t{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.sub{color:var(--mu);font-size:12.5px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:14px;margin-top:14px}
+.banner{margin-top:12px;padding:10px 12px;border-radius:8px;border:1px solid var(--warn);color:var(--warn);font-size:13.5px;display:none}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+select,input[type=number],button{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:6px 10px}
+button{cursor:pointer}button[aria-pressed="true"]{background:var(--pri);color:var(--card);border-color:var(--pri)}
+label.ck{display:inline-flex;gap:5px;align-items:center;font-size:13px;cursor:pointer}
+.grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:860px){.grid.two{grid-template-columns:1.6fr 1fr}}
+.chartwrap{position:relative}svg{width:100%;height:auto;display:block;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:6px 9px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);display:none;white-space:nowrap}
+.verdict{border-left:6px solid var(--mu);padding:8px 12px;border-radius:6px;background:var(--bg);margin-bottom:10px}
+.verdict .big{font-size:18px;font-weight:700}
+.verdict.go{border-color:var(--ok)}.verdict.go .big{color:var(--ok)}
+.verdict.wait{border-color:var(--bad)}.verdict.wait .big{color:var(--bad)}
+.verdict.mid{border-color:var(--warn)}.verdict.mid .big{color:var(--warn)}
+ul.why{margin:6px 0 0;padding-left:18px;font-size:13.5px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13.5px}.kv b{font-variant-numeric:tabular-nums;text-align:right}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
+th,td{border:1px solid var(--ln);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--pri);color:var(--card)}
+tr.sel td{background:rgba(42,157,143,.12)}tbody tr{cursor:pointer}
+.chip{display:inline-block;padding:0 8px;border-radius:99px;font-size:12px;border:1px solid var(--ln);white-space:nowrap}
+.chip.go{color:var(--ok);border-color:var(--ok)}.chip.wait{color:var(--bad);border-color:var(--bad)}.chip.na{color:var(--mu)}
+.neg{color:var(--bad)}.pos{color:var(--ok)}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+footer{margin:18px 0 30px;font-size:12.5px;color:var(--mu)}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div><h1>投資策略儀表板</h1><div class="sub">證券投資分析課堂報告｜規則型訊號示範，不是投資建議</div></div>
+  <div class="clock"><div class="t" id="clock">—</div><div class="sub" id="mkt"></div></div>
+</header>
+<div class="sub" id="meta"></div>
+<div class="banner" id="banner" role="alert"></div>
+
+<section class="card">
+  <div class="row">
+    <label for="sel"><b>標的</b></label><select id="sel"></select>
+    <span id="ranges"></span>
+  </div>
+  <div class="row" id="mas"></div>
+  <div class="grid two">
+    <div>
+      <div class="chartwrap" id="cw"><svg id="ch" viewBox="0 0 760 330" role="img" aria-label="價格與均線走勢圖"></svg><div class="tip" id="tip"></div></div>
+      <div class="sub" id="chnote"></div>
+    </div>
+    <div>
+      <h2>現在可以進場嗎？</h2>
+      <div class="verdict" id="verdict"></div>
+      <div class="kv" id="kv"></div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>全部標的一覽（點一列切換上方圖表）</h2>
+  <div class="wrap"><table><thead><tr><th>標的</th><th class="num">最新收盤</th><th class="num">日漲跌</th><th class="num">200 日均線</th><th class="num">距均線</th><th class="num">自近 120 日高點</th><th>趨勢訊號</th><th>費用</th><th>規模／存續期間</th></tr></thead><tbody id="tbody"></tbody></table></div>
+</section>
+
+<section class="card">
+  <h2>資產配置與分批進場試算</h2>
+  <div class="row">
+    <label for="prof"><b>風險取向</b></label>
+    <select id="prof"><option value="c">保守型（股 25／債 45／現金 30）</option><option value="b" selected>平衡型（股 40／債 35／現金 25）</option><option value="a">積極型（股 65／債 25／現金 10）</option></select>
+    <label for="cap"><b>本金（NT$）</b></label><input id="cap" type="number" min="10000" step="10000" value="300000" style="width:130px">
+    <label for="nb"><b>分批數</b></label><select id="nb"><option>3</option><option selected>6</option><option>12</option></select>
+  </div>
+  <div class="grid two">
+    <div class="wrap"><table style="min-width:420px"><thead><tr><th>部位</th><th class="num">比重</th><th class="num">金額（NT$）</th><th>示例工具</th></tr></thead><tbody id="alloc"></tbody></table></div>
+    <div><svg id="donut" viewBox="0 0 220 220" role="img" aria-label="資產配置圓餅圖" style="max-width:240px;margin:auto"></svg></div>
+  </div>
+  <p class="sub" id="plan" style="margin-top:10px"></p>
+</section>
+
+<footer>
+  <p>資料來源與更新：價格由 fetch_data.py 以日收盤價寫入 data.json，頁面讀取後在你的瀏覽器計算均線與訊號；頁面上方時鐘是你裝置現在的時間，不代表價格是即時的。費用、規模、存續期間來自公開網站人工彙整（2026/11/17 前後），請以投信公開說明書為準。</p>
+  <p>訊號規則：收盤價高於 200 日均線視為趨勢向上；自近 120 日高點回撤 10%／20%／30% 為加碼與停止加碼門檻。這是把課堂報告的規則程式化，不考慮你的個人狀況，不構成投資建議；投資有風險，可能損失本金。</p>
+</footer>
+</main>
+
+<script>
+const META=[
+ {code:"0050",name:"元大台灣50",g:"eq",ccy:"TWD",fee:"經理費最低級距 0.05%＋保管費 0.025%（來源不一）",size:"約 2.4–2.6 兆元",dur:"—"},
+ {code:"006208",name:"富邦台50",g:"eq",ccy:"TWD",fee:"總管理費用 0.23%",size:"約 4,099 億元",dur:"—"},
+ {code:"VT",name:"Vanguard 全世界股票",g:"eq",ccy:"USD",fee:"費用率 0.06%",size:"約 1,012 億美元",dur:"—"},
+ {code:"00719B",name:"元大美債1-3",g:"bd",ccy:"TWD",fee:"總管理費用 0.17%",size:"約 96.4 億元",dur:"同類指數有效存續期間約 1.8–2.0 年"},
+ {code:"00864B",name:"中信美國公債0-1",g:"bd",ccy:"TWD",fee:"經理費 0.10%",size:"約 52 億元",dur:"約 0.1–0.2 年"},
+ {code:"00865B",name:"國泰US短期公債",g:"bd",ccy:"TWD",fee:"經理費 0.10%",size:"約 164 億元",dur:"約 0.1–0.2 年"},
+ {code:"00856B",name:"永豐1-3年美公債",g:"bd",ccy:"TWD",fee:"總管理費用 0.26%",size:"約 2.5 億元（偏小）",dur:"2.01 年（2026/6/22）"},
+ {code:"00720B",name:"元大投資級公司債",g:"bd",ccy:"TWD",fee:"總管理費用 0.39%",size:"—",dur:"20 年以上 BBB 公司債，存續期間長"}
+];
+const PROF={c:{n:"保守型",s:25,b:45,c:30},b:{n:"平衡型",s:40,b:35,c:25},a:{n:"積極型",s:65,b:25,c:10}};
+const RANGES={"1M":22,"3M":66,"6M":132,"1Y":252,"2Y":504,"全部":0};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const f=(n,d=2)=>Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const pc=n=>(n>0?"+":n<0?"−":"")+Math.abs(n).toFixed(2)+"%";
+let DATA=null,cur="0050",rng="1Y",showMA={20:false,60:true,200:true};
+
+function sma(a,n){const o=new Array(a.length).fill(null);let s=0;for(let i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];if(i>=n-1)o[i]=s/n}return o}
+function analyze(code){
+  const s=DATA&&DATA.series&&DATA.series[code];if(!s||!s.close.length)return null;
+  const c=s.close,n=c.length,last=c[n-1],prev=n>1?c[n-2]:null;
+  const ma200=n>=200?sma(c,200):null,m=ma200?ma200[n-1]:null;
+  const slope=ma200&&n>=220?(m/ma200[n-21]-1)*100:null;
+  const win=c.slice(-Math.min(120,n)),peak=Math.max(...win),dd=(last/peak-1)*100;
+  return {s,c,n,last,date:s.dates[n-1],chg:prev?(last/prev-1)*100:null,m,slope,peak,dd,peakN:win.length,vs:m?(last/m-1)*100:null};
+}
+function verdictOf(meta,a){
+  if(!a)return {cls:"mid",big:"沒有資料",why:["data.json 裡沒有這檔的價格。"]};
+  const why=[];
+  if(!a.m){return {cls:"mid",big:"資料不足，無法判斷",why:[`目前只有 ${a.n} 筆收盤價，計算 200 日均線至少需要 200 筆。請執行 fetch_data.py 或啟用自動更新後再看。`]};}
+  const up=a.last>a.m;
+  why.push(`最新收盤 ${f(a.last)}，200 日均線 ${f(a.m)}，價格${up?"高於":"低於"}均線 ${Math.abs(a.vs).toFixed(2)}%。`);
+  if(a.slope!=null)why.push(`200 日均線近 20 日${a.slope>=0?"上升":"下降"} ${Math.abs(a.slope).toFixed(2)}%。`);
+  why.push(`自近 ${a.peakN} 日高點 ${f(a.peak)} 回撤 ${a.dd.toFixed(2)}%。`);
+  if(meta.g==="bd"){
+    if(up)return {cls:"go",big:"債券部位：可依配置分批建立",why:[...why,"債券是組合的緩衝，趨勢向上時按計畫投入即可。"]};
+    return {cls:"mid",big:"債券價格偏弱：放慢建立速度",why:[...why,"價格低於 200 日線，常代表利率上升或信用利差擴大，可分更多批投入。"]};
+  }
+  if(!up){return {cls:"wait",big:"趨勢轉弱：本月股票批次順延",why:[...why,"依規則，指數低於 200 日均線時順延，資金先留在債券／現金，不補投被順延的批次。"]};}
+  if(a.dd<=-30)return {cls:"wait",big:"回撤已達 −30%：停止加碼並檢討",why};
+  if(a.dd<=-20)return {cls:"go",big:"趨勢向上且回撤 −20%：可動用第 2 個 1/3 預備現金",why};
+  if(a.dd<=-10)return {cls:"go",big:"趨勢向上且回撤 −10%：可動用第 1 個 1/3 預備現金",why};
+  return {cls:"go",big:"趨勢向上：可按計畫分批進場",why};
+}
+
+function clock(){
+  const now=new Date();
+  $("clock").textContent=now.toLocaleString("zh-TW",{timeZone:"Asia/Taipei",year:"numeric",month:"long",day:"numeric",weekday:"long",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+  const p=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",weekday:"short",hour:"numeric",minute:"numeric",hour12:false}).formatToParts(now).map(x=>[x.type,x.value]));
+  const mins=(+p.hour%24)*60+ +p.minute,wk=!["Sat","Sun"].includes(p.weekday);
+  $("mkt").textContent="台北時間｜台股"+(wk&&mins>=540&&mins<810?"交易時段內":"非交易時段")+"（未計入國定假日）";
+}
+
+function buildControls(){
+  $("sel").innerHTML=META.map(m=>`<option value="${m.code}">${m.code} ${esc(m.name)}</option>`).join("");
+  $("sel").onchange=e=>{cur=e.target.value;render()};
+  $("ranges").innerHTML=Object.keys(RANGES).map(k=>`<button data-r="${k}" aria-pressed="${k===rng}">${k}</button>`).join(" ");
+  $("ranges").onclick=e=>{const b=e.target.closest("button");if(b){rng=b.dataset.r;render()}};
+  $("mas").innerHTML=`<span class="sub">均線：</span>`+[20,60,200].map(n=>`<label class="ck"><input type="checkbox" data-m="${n}" ${showMA[n]?"checked":""}><span style="color:var(--ma${n});font-weight:700">${n} 日</span></label>`).join("");
+  $("mas").onchange=e=>{showMA[e.target.dataset.m]=e.target.checked;render()};
+  $("prof").onchange=renderAlloc;$("cap").oninput=renderAlloc;$("nb").onchange=renderAlloc;
+}
+
+function render(){
+  $("sel").value=cur;
+  [...$("ranges").children].forEach(b=>b.setAttribute("aria-pressed",b.dataset.r===rng));
+  const meta=META.find(m=>m.code===cur),a=analyze(cur),v=verdictOf(meta,a);
+  drawChart(a,meta);
+  $("verdict").className="verdict "+v.cls;
+  $("verdict").innerHTML=`<div class="big">${esc(v.big)}</div><ul class="why">${v.why.map(w=>`<li>${esc(w)}</li>`).join("")}</ul>`;
+  $("kv").innerHTML=a?`<span>最新收盤（${esc(a.date)}）</span><b>${f(a.last)} ${meta.ccy}</b><span>200 日均線</span><b>${a.m?f(a.m):"資料不足"}</b><span>近 ${a.peakN} 日高點</span><b>${f(a.peak)}</b><span>−10% 加碼線</span><b>${f(a.peak*0.9)}</b><span>−20% 加碼線</span><b>${f(a.peak*0.8)}</b><span>費用</span><b style="font-weight:500;text-align:right">${esc(meta.fee)}</b><span>規模</span><b style="font-weight:500;text-align:right">${esc(meta.size)}</b><span>存續期間</span><b style="font-weight:500;text-align:right">${esc(meta.dur)}</b>`:"";
+  renderTable();
+}
+
+function drawChart(a,meta){
+  const svg=$("ch"),tip=$("tip");tip.style.display="none";
+  if(!a||a.n<2){svg.innerHTML=`<text x="380" y="165" text-anchor="middle" fill="var(--mu)" font-size="14">這檔目前只有 ${a?a.n:0} 筆資料，無法畫走勢圖</text>`;$("chnote").textContent="";return}
+  const W=760,H=330,L=54,R=14,T=14,B=30,full=a.c,dates=a.s.dates,n=a.n;
+  const k=RANGES[rng]?Math.min(RANGES[rng],n):n,st=n-k;
+  const mas={};[20,60,200].forEach(x=>{if(showMA[x])mas[x]=sma(full,x)});
+  const px=full.slice(st);let lo=Math.min(...px),hi=Math.max(...px);
+  Object.values(mas).forEach(arr=>arr.slice(st).forEach(v=>{if(v!=null){lo=Math.min(lo,v);hi=Math.max(hi,v)}}));
+  const ddl=a.peak*0.9;if(ddl>lo*0.9)lo=Math.min(lo,ddl);
+  const pad=(hi-lo)*0.06||1;lo-=pad;hi+=pad;
+  const x=i=>L+(W-L-R)*(k>1?i/(k-1):0),y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+  let s="";const step=(hi-lo)/5;
+  for(let i=0;i<=5;i++){const v=lo+step*i;s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--ln)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--mu)">${f(v,v>=100?0:1)}</text>`}
+  const tc=Math.min(7,k);for(let j=0;j<tc;j++){const i=Math.round((k-1)*j/(tc-1||1));s+=`<text x="${x(i)}" y="${H-10}" text-anchor="${j===0?"start":j===tc-1?"end":"middle"}" font-size="10.5" fill="var(--mu)">${dates[st+i].slice(2)}</text>`}
+  if(ddl>lo&&ddl<hi)s+=`<line x1="${L}" x2="${W-R}" y1="${y(ddl)}" y2="${y(ddl)}" stroke="var(--bad)" stroke-dasharray="5 4"/><text x="${L+4}" y="${y(ddl)-4}" font-size="11" fill="var(--bad)">−10% 加碼線 ${f(ddl)}</text>`;
+  const line=(arr,col,w)=>{let d="",on=false;arr.forEach((v,i)=>{if(v==null){on=false;return}d+=(on?"L":"M")+x(i).toFixed(1)+","+y(v).toFixed(1);on=true});return `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round"/>`};
+  Object.entries(mas).forEach(([n2,arr])=>{s+=line(arr.slice(st),`var(--ma${n2})`,n2==200?2:1.5)});
+  s+=line(px,"var(--pri)",2.2);
+  s+=`<line id="xh" y1="${T}" y2="${H-B}" stroke="var(--mu)" stroke-dasharray="3 3" style="display:none"/><circle id="dot" r="4" fill="var(--pri)" style="display:none"/><rect id="hit" x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent"/>`;
+  svg.innerHTML=s;
+  $("chnote").textContent=`${meta.code} ${meta.name}｜${dates[st]} 至 ${dates[n-1]}｜共 ${k} 個交易日｜滑鼠移上去或手指按住可看每日數值`;
+  const hit=$("hit"),xh=$("xh"),dot=$("dot");
+  const move=ev=>{const r=svg.getBoundingClientRect(),cx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+    const vx=cx/r.width*W,i=Math.max(0,Math.min(k-1,Math.round((vx-L)/(W-L-R)*(k-1)))),g=st+i;
+    xh.setAttribute("x1",x(i));xh.setAttribute("x2",x(i));xh.style.display="";dot.setAttribute("cx",x(i));dot.setAttribute("cy",y(full[g]));dot.style.display="";
+    const m=Object.entries(mas).map(([n2,arr])=>arr[g]!=null?`<div><span style="color:var(--ma${n2})">${n2} 日線</span> ${f(arr[g])}</div>`:"").join("");
+    tip.innerHTML=`<b>${dates[g]}</b><div>收盤 ${f(full[g])} ${meta.ccy}</div>${m}`;tip.style.display="block";
+    const px2=x(i)/W*r.width;tip.style.left=Math.min(px2+12,r.width-tip.offsetWidth-4)+"px";tip.style.top="8px"};
+  hit.addEventListener("mousemove",move);hit.addEventListener("touchmove",move,{passive:true});hit.addEventListener("touchstart",move,{passive:true});
+  hit.addEventListener("mouseleave",()=>{xh.style.display="none";dot.style.display="none";tip.style.display="none"});
+}
+
+function renderTable(){
+  $("tbody").innerHTML=META.map(m=>{const a=analyze(m.code),v=verdictOf(m,a);
+    const chip=!a||!a.m?`<span class="chip na">資料不足</span>`:`<span class="chip ${v.cls==="go"?"go":v.cls==="wait"?"wait":"na"}">${a.last>a.m?"向上":"轉弱"}</span>`;
+    return `<tr data-c="${m.code}" class="${m.code===cur?"sel":""}"><td><b>${m.code}</b><br>${esc(m.name)}</td><td class="num">${a?f(a.last)+" "+m.ccy:"—"}<br><span class="sub">${a?a.date.slice(5):""}</span></td><td class="num ${a&&a.chg<0?"neg":"pos"}">${a&&a.chg!=null?pc(a.chg):"—"}</td><td class="num">${a&&a.m?f(a.m):"—"}</td><td class="num ${a&&a.vs<0?"neg":"pos"}">${a&&a.vs!=null?pc(a.vs):"—"}</td><td class="num ${a&&a.n>=2&&a.dd<0?"neg":""}">${a&&a.n>=2?pc(a.dd):"—"}</td><td>${chip}</td><td>${esc(m.fee)}</td><td>${esc(m.size)}${m.dur!=="—"?"<br>"+esc(m.dur):""}</td></tr>`}).join("");
+  $("tbody").onclick=e=>{const tr=e.target.closest("tr");if(tr){cur=tr.dataset.c;render();window.scrollTo({top:0,behavior:"smooth"})}};
+}
+
+function renderAlloc(){
+  const p=PROF[$("prof").value],cap=Math.max(0,+$("cap").value||0),nb=+$("nb").value;
+  const rows=[["台股市值型 ETF",p.s/2,"0050 或 006208"],["全球股票 ETF",p.s/2,"VT（美元計價，需複委託／海外券商）"],["債券型 ETF",p.b,"00719B 元大美債1-3"],["現金／短債",p.c,"貨幣市場基金、定存，或 00864B／00865B"]];
+  $("alloc").innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}%</td><td class="num">${f(cap*r[1]/100,0)}</td><td>${r[2]}</td></tr>`).join("");
+  const col=["var(--pri)","var(--ac)","var(--ma20)","var(--mu)"],R=80,C=2*Math.PI*R;let off=0,s="";
+  rows.forEach((r,i)=>{const len=C*r[1]/100;s+=`<circle cx="110" cy="110" r="${R}" fill="none" stroke="${col[i]}" stroke-width="34" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 110 110)"/>`;off+=len});
+  s+=`<text x="110" y="106" text-anchor="middle" font-size="13" fill="var(--mu)">${p.n}</text><text x="110" y="124" text-anchor="middle" font-size="12" font-weight="700" fill="var(--tx)">股${p.s}｜債${p.b}｜現${p.c}</text>`;
+  $("donut").innerHTML=s;
+  const eq=cap*p.s/100,v=verdictOf(META[0],analyze("0050"));
+  $("plan").textContent=`股票部位 NT$${f(eq,0)} 分 ${nb} 批，每批約 NT$${f(eq/nb,0)}。依 0050 目前的訊號：「${v.big}」。（訊號只針對股票批次；債券與現金可先配置到位。）`;
+}
+
+async function load(){
+  try{const r=await fetch("data.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);DATA=await r.json()}
+  catch(e){DATA={series:{}};const b=$("banner");b.style.display="block";b.textContent="讀不到 data.json（"+e.message+"）。如果你是直接雙擊 index.html 開啟，瀏覽器會擋讀檔；請改用 python -m http.server 8000 後開 http://localhost:8000，或使用部署好的網址。"}
+  const fail=(DATA.failed||[]).length?"；本次抓取失敗："+DATA.failed.join("、"):"";
+  $("meta").textContent=DATA.updated?`資料更新時間：${DATA.updated}（台北時間）｜${DATA.source||""}${fail}`:"";
+  const dates=Object.values(DATA.series||{}).map(s=>s.dates[s.dates.length-1]).sort();
+  if(dates.length){const newest=dates[dates.length-1],age=(Date.now()-new Date(newest+"T00:00:00+08:00"))/864e5;
+    if(age>5){const b=$("banner");b.style.display="block";b.textContent=`最新價格日期是 ${newest}，已超過 5 天沒有更新，訊號可能過時。`}}
+  render();renderAlloc();
+}
+buildControls();clock();setInterval(clock,1000);load();setInterval(load,5*60*1000);
+</script>
+</body>
+</html>
