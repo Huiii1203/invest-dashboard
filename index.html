@@ -94,7 +94,7 @@ footer{margin:18px 0 30px;font-size:12.5px;color:var(--mu)}
 
 <footer>
   <p>資料來源與更新：價格由 fetch_data.py 以日收盤價寫入 data.json，頁面讀取後在你的瀏覽器計算均線與訊號；頁面上方時鐘是你裝置現在的時間，不代表價格是即時的。費用、規模、存續期間來自公開網站人工彙整（2026/11/17 前後），請以投信公開說明書為準。</p>
-  <p>訊號規則：收盤價高於 200 日均線視為趨勢向上；自近 120 日高點回撤 10%／20%／30% 為加碼與停止加碼門檻。這是把課堂報告的規則程式化，不考慮你的個人狀況，不構成投資建議；投資有風險，可能損失本金。</p>
+  <p>訊號規則：兩條規則各自獨立。收盤價高於 200 日均線視為趨勢向上，只決定每月定期批次要不要投入；自近 120 日高點回撤 10%／20%／30% 決定預備現金何時加碼與停止加碼，不受趨勢影響。這是把課堂報告的規則程式化，不考慮你的個人狀況，不構成投資建議；投資有風險，可能損失本金。</p>
 </footer>
 </main>
 
@@ -138,11 +138,12 @@ function verdictOf(meta,a){
     if(up)return {cls:"go",big:"債券部位：可依配置分批建立",why:[...why,"債券是組合的緩衝，趨勢向上時按計畫投入即可。"]};
     return {cls:"mid",big:"債券價格偏弱：放慢建立速度",why:[...why,"價格低於 200 日線，常代表利率上升或信用利差擴大，可分更多批投入。"]};
   }
-  if(!up){return {cls:"wait",big:"趨勢轉弱：本月股票批次順延",why:[...why,"依規則，指數低於 200 日均線時順延，資金先留在債券／現金，不補投被順延的批次。"]};}
-  if(a.dd<=-30)return {cls:"wait",big:"回撤已達 −30%：停止加碼並檢討",why};
-  if(a.dd<=-20)return {cls:"go",big:"趨勢向上且回撤 −20%：可動用第 2 個 1/3 預備現金",why};
-  if(a.dd<=-10)return {cls:"go",big:"趨勢向上且回撤 −10%：可動用第 1 個 1/3 預備現金",why};
-  return {cls:"go",big:"趨勢向上：可按計畫分批進場",why};
+  const batch=up?"定期批次：趨勢向上，照常投入":"定期批次：趨勢轉弱，本月順延";
+  const add=a.dd<=-30?"預備現金：回撤已達 −30%，停止加碼並檢討":a.dd<=-20?"預備現金：回撤 −20%，可動用第 2 個 1/3":a.dd<=-10?"預備現金：回撤 −10%，可動用第 1 個 1/3":"預備現金：尚未觸及加碼門檻";
+  why.push(up?"趨勢過濾只決定每月定期批次：價格在 200 日線之上，照計畫投入。":"趨勢過濾只決定每月定期批次：價格低於 200 日線，順延本月批次，資金留在債券／現金，不補投。");
+  why.push("加碼規則獨立判斷，不受趨勢影響：只看自近 "+a.peakN+" 日高點的回撤幅度（−10%／−20% 各動用 1/3 預備現金，−30% 停止加碼）。");
+  const cls=a.dd<=-30?"wait":up?"go":(a.dd<=-10?"mid":"wait");
+  return {cls,big:batch+"\n"+add,why};
 }
 
 function clock(){
@@ -169,7 +170,7 @@ function render(){
   const meta=META.find(m=>m.code===cur),a=analyze(cur),v=verdictOf(meta,a);
   drawChart(a,meta);
   $("verdict").className="verdict "+v.cls;
-  $("verdict").innerHTML=`<div class="big">${esc(v.big)}</div><ul class="why">${v.why.map(w=>`<li>${esc(w)}</li>`).join("")}</ul>`;
+  $("verdict").innerHTML=`<div class="big">${esc(v.big).replace(/\n/g,"<br>")}</div><ul class="why">${v.why.map(w=>`<li>${esc(w)}</li>`).join("")}</ul>`;
   $("kv").innerHTML=a?`<span>最新收盤（${esc(a.date)}）</span><b>${f(a.last)} ${meta.ccy}</b><span>200 日均線</span><b>${a.m?f(a.m):"資料不足"}</b><span>近 ${a.peakN} 日高點</span><b>${f(a.peak)}</b><span>−10% 加碼線</span><b>${f(a.peak*0.9)}</b><span>−20% 加碼線</span><b>${f(a.peak*0.8)}</b><span>費用</span><b style="font-weight:500;text-align:right">${esc(meta.fee)}</b><span>規模</span><b style="font-weight:500;text-align:right">${esc(meta.size)}</b><span>存續期間</span><b style="font-weight:500;text-align:right">${esc(meta.dur)}</b>`:"";
   renderTable();
 }
@@ -208,7 +209,7 @@ function drawChart(a,meta){
 
 function renderTable(){
   $("tbody").innerHTML=META.map(m=>{const a=analyze(m.code),v=verdictOf(m,a);
-    const chip=!a||!a.m?`<span class="chip na">資料不足</span>`:`<span class="chip ${v.cls==="go"?"go":v.cls==="wait"?"wait":"na"}">${a.last>a.m?"向上":"轉弱"}</span>`;
+    const chip=!a||!a.m?`<span class="chip na">資料不足</span>`:`<span class="chip ${a.last>a.m?"go":"wait"}">${a.last>a.m?"向上":"轉弱"}</span>`;
     return `<tr data-c="${m.code}" class="${m.code===cur?"sel":""}"><td><b>${m.code}</b><br>${esc(m.name)}</td><td class="num">${a?f(a.last)+" "+m.ccy:"—"}<br><span class="sub">${a?a.date.slice(5):""}</span></td><td class="num ${a&&a.chg<0?"neg":"pos"}">${a&&a.chg!=null?pc(a.chg):"—"}</td><td class="num">${a&&a.m?f(a.m):"—"}</td><td class="num ${a&&a.vs<0?"neg":"pos"}">${a&&a.vs!=null?pc(a.vs):"—"}</td><td class="num ${a&&a.n>=2&&a.dd<0?"neg":""}">${a&&a.n>=2?pc(a.dd):"—"}</td><td>${chip}</td><td>${esc(m.fee)}</td><td>${esc(m.size)}${m.dur!=="—"?"<br>"+esc(m.dur):""}</td></tr>`}).join("");
   $("tbody").onclick=e=>{const tr=e.target.closest("tr");if(tr){cur=tr.dataset.c;render();window.scrollTo({top:0,behavior:"smooth"})}};
 }
@@ -222,7 +223,7 @@ function renderAlloc(){
   s+=`<text x="110" y="106" text-anchor="middle" font-size="13" fill="var(--mu)">${p.n}</text><text x="110" y="124" text-anchor="middle" font-size="12" font-weight="700" fill="var(--tx)">股${p.s}｜債${p.b}｜現${p.c}</text>`;
   $("donut").innerHTML=s;
   const eq=cap*p.s/100,v=verdictOf(META[0],analyze("0050"));
-  $("plan").textContent=`股票部位 NT$${f(eq,0)} 分 ${nb} 批，每批約 NT$${f(eq/nb,0)}。依 0050 目前的訊號：「${v.big}」。（訊號只針對股票批次；債券與現金可先配置到位。）`;
+  $("plan").textContent=`股票部位 NT$${f(eq,0)} 分 ${nb} 批，每批約 NT$${f(eq/nb,0)}。依 0050 目前的訊號：「${v.big.replace(/\n/g,"；")}」。（訊號只針對股票批次；債券與現金可先配置到位。）`;
 }
 
 async function load(){
